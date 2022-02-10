@@ -266,10 +266,24 @@ func ProtoDeserialize(protoBs []byte) (Sketch, error) {
 		return nil, err
 	}
 
-	s := createSketch()
-	s.version = sketchpb.Version
+	return FromProtoSketch(&sketchpb)
+}
 
-	for i, registerpb := range sketchpb.Registers {
+// FromProtoSketch returns a Sketch from a generated protobuf type. The proto schema used can be
+// found in the companion repository: https://github.com/kixa/hll-protobuf
+func FromProtoSketch(sketch *hllProto.Sketch) (Sketch, error) {
+	if sketch == nil {
+		return nil, fmt.Errorf("cannot deserialize nil sketch")
+	}
+
+	if len(sketch.Registers) <= 0 {
+		return nil, ErrorMalformedPrecision
+	}
+
+	s := createSketch()
+	s.version = sketch.Version
+
+	for i, registerpb := range sketch.Registers {
 		s.registers[i] = uint8(registerpb)
 	}
 

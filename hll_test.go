@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"testing"
 
+	hllProto "github.com/kixa/hll-protobuf"
 	"github.com/zeebo/xxh3"
 )
 
@@ -173,6 +174,26 @@ func TestSketch_MergeBadPrecision(t *testing.T) {
 	}
 }
 
+func TestSketch_ProtoSketch(t *testing.T) {
+	s := NewSketch()
+	ps := s.ProtoSketch()
+
+	if ps == nil {
+		t.Logf("proto sketch - expected a proto sketch, got nil")
+		t.FailNow()
+	}
+
+	if s.getVersion() != ps.Version {
+		t.Logf("proto sketch - expected version: %s, got: %s", s.getVersion(), ps.Version)
+		t.Fail()
+	}
+
+	if len(s.getRegisters()) != len(ps.Registers) {
+		t.Logf("proto sketch - expected register len: %d, got: %d", len(s.getRegisters()), len(ps.Registers))
+		t.Fail()
+	}
+}
+
 func TestSketch_ProtoSerialize(t *testing.T) {
 	s := NewSketch()
 	_, err := s.ProtoSerialize()
@@ -286,6 +307,41 @@ func runProtoDeserialize(t *testing.T, entries int) {
 
 	if len(preS.getRegisters()) != len(postS.getRegisters()) {
 		t.Logf("proto deserialize - %d entries, pre-s register len: %d does not match post-s register len: %d", entries, len(preS.getRegisters()), len(postS.getRegisters()))
+		t.Fail()
+	}
+}
+
+func TestFromProtoSketch_Nil(t *testing.T) {
+	_, err := FromProtoSketch(nil)
+
+	if err == nil {
+		t.Log("from proto sketch - expected to fail when called with nil, but did not")
+		t.Fail()
+	}
+}
+
+func TestFromProtoSketch_NoRegisters(t *testing.T) {
+	_, err := FromProtoSketch(&hllProto.Sketch{})
+
+	if err == nil {
+		t.Log("from proto sketch - expected to fail when called with empty initialised proto type, but did not")
+		t.Fail()
+	}
+}
+
+func TestFromProtoSketch(t *testing.T) {
+	s0 := NewSketch()
+	ps0 := s0.ProtoSketch()
+
+	s1, err := FromProtoSketch(ps0)
+
+	if err != nil {
+		t.Logf("from proto sketch - unexpected error going back to Sketch from proto: %v", err)
+		t.FailNow()
+	}
+
+	if s1 == nil {
+		t.Log("from proto sketch - expected Sketch, got nil")
 		t.Fail()
 	}
 }
