@@ -6,7 +6,7 @@ import (
 	"math"
 	"math/bits"
 
-	hllProto "github.com/kixa/hll-go/proto"
+	hllProto "github.com/kixa/hll-protobuf"
 	"github.com/zeebo/xxh3"
 	"google.golang.org/protobuf/proto"
 )
@@ -49,8 +49,14 @@ type Sketch interface {
 	// error if the Merge could not be completed.
 	Merge(other Sketch) (Sketch, error)
 
-	// ProtoSerialize returns []byte representing this Sketch. The serialization format can be found
-	// at: https://github.com/kixa/hll-protobuf
+	// ProtoSketch returns the protobuf serializable struct representing this Sketch and should only be used for
+	// embedding Sketches into larger protobuf messages. For all other use-cases use ProtoSerialize.
+	// The reference proto format can be found at: https://github.com/kixa/hll-protobuf
+	ProtoSketch() *hllProto.Sketch
+
+	// ProtoSerialize returns []byte representing this Sketch.
+	// The reference proto format can be found at: https://github.com/kixa/hll-protobuf
+	// This is equivalent to calling proto.Marshal on the result of ProtoSketch.
 	ProtoSerialize() ([]byte, error)
 
 	getRegisters() []uint8
@@ -186,19 +192,26 @@ func (s *sketch) Merge(other Sketch) (Sketch, error) {
 	return s, nil
 }
 
-// ProtoSerialize returns an encoded protobuf version of this Sketch. The proto schema used can be
-// found in the companion repository: https://github.com/kixa/hll-protobuf
-func (s *sketch) ProtoSerialize() ([]byte, error) {
+// ProtoSketch returns a protobuf compatible version of this Sketch.
+// NOTE: This should only be used for embedding a sketch into a larger protobuf message, all other
+// serialization should use ProtoSerialize.
+func (s *sketch) ProtoSketch() *hllProto.Sketch {
 	registerspb := make([]uint32, len(s.registers))
 
 	for i, r := range s.registers {
 		registerspb[i] = uint32(r)
 	}
 
-	return proto.Marshal(&hllProto.Sketch{
+	return &hllProto.Sketch{
 		Version:   s.version,
 		Registers: registerspb,
-	})
+	}
+}
+
+// ProtoSerialize returns an encoded protobuf version of this Sketch. The proto schema used can be
+// found in the companion repository: https://github.com/kixa/hll-protobuf
+func (s *sketch) ProtoSerialize() ([]byte, error) {
+	return proto.Marshal(s.ProtoSketch())
 }
 
 func (s *sketch) getRegisters() []uint8 {
